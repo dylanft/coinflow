@@ -1,0 +1,6 @@
+[project]
+name = "coinflow"
+requirements = []
+[contracts.coinflow]
+path = "contracts/coinflow.clar"
+depends_on = []
