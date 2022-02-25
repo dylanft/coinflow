@@ -24,6 +24,16 @@
 (define-map debtSource principal principal) ;; maps lender to a borrower
 (define-map initDeadline principal uint) ;; borrower must send collateral to LP by initDeadline. principal = LP.
 (define-map repayDeadline principal uint)
+(define-map loans
+    {borrower: principal, LP: principal}
+    {
+        loanBalance: uint,
+        originalLoanAmount: uint,
+        repaymentBlockDeadline: uint,
+        borrowerCollateralAmt: uint,
+        lpCollateralAmt: uint
+    }
+)
 
 
 ;; variables
@@ -50,6 +60,10 @@
 
 (define-read-only (get-loan-repayment-deadline (wallet principal))
 	(map-get? repayDeadline wallet)
+)
+
+(define-read-only (get-loan-health (borrower principal) (lender principal))
+    (map-get? loans {borrower: borrower, LP: lender})
 )
 
 (define-private (set-loan-source (borrower principal) (lender principal))
@@ -92,7 +106,7 @@
 	(begin
 		(print (unwrap! (get-loan-interest-from tx-sender) err-no-interest))
 
-		;;checks to see if there is any loan interest. otherwise, txn fails.
+		;;checks to see if the borrower has declared interest in getting a loan. otherwise, txn fails.
 		(asserts! (>= (unwrap! (get-loan-interest-from tx-sender) err-no-interest) u0) err-insufficient-funds)
 		
 		;; asserts that LP input is same as wallet that locked up the loan amount and LP collateral.
@@ -123,7 +137,18 @@
 		;; (map-set repayDeadline tx-sender (+ block-height ((unwrap! (get-loan-length-from tx-sender) err-no-interest))))
 		;; (map-set repayDeadline tx-sender (+ block-height u4320))
 		(map-set repayDeadline tx-sender (+ block-height (unwrap! (get-loan-length-from tx-sender) err-no-interest)))
-
+        
+        ;; Initialize the loan and store info in map
+        (map-set loans
+            {borrower: tx-sender, LP: lp}
+            {
+                loanBalance: (/ amount u2),
+                originalLoanAmount: (/ amount u2),
+                repaymentBlockDeadline: (+ block-height (unwrap! (get-loan-length-from tx-sender) err-no-interest)),
+                borrowerCollateralAmt: amount,
+                lpCollateralAmt: (* u2 amount)
+            }
+        )
 		(ok true)
 		;; TODO: add a new loan event to some dictionary like data store in the smart contract.
 
@@ -163,7 +188,7 @@
 ;; (contract-call? 'ST1HTBVD3JG9C05J7HBJTHGR0GGW7KXW28M5JS8QE.coinflow get-loan-interest-from tx-sender)
 ;; (contract-call? 'ST1HTBVD3JG9C05J7HBJTHGR0GGW7KXW28M5JS8QE.coinflow send-STX-collateral-to-LP u500 'ST1J4G6RR643BCG8G8SR6M2D9Z9KXT2NJDRK3FBTK)
 
-;; ;; More testing
+;; More testing
 ;; ::set_tx_sender ST1J4G6RR643BCG8G8SR6M2D9Z9KXT2NJDRK3FBTK
 ;; (contract-call? 'ST1HTBVD3JG9C05J7HBJTHGR0GGW7KXW28M5JS8QE.coinflow signal-interest u1000 u145)
 ;; ::advance_chain_tip 1
