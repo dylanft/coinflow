@@ -27,12 +27,15 @@
 (define-map loans
     {borrower: principal, LP: principal}
     {
-        loanBalance: uint,
         originalLoanAmount: uint,
         repaymentBlockDeadline: uint,
         borrowerCollateralAmt: uint,
         lpCollateralAmt: uint
     }
+)
+(define-map loanBalances
+    {borrower: principal, LP: principal}
+    uint
 )
 
 
@@ -64,6 +67,10 @@
 
 (define-read-only (get-loan-health (borrower principal) (lender principal))
     (map-get? loans {borrower: borrower, LP: lender})
+)
+
+(define-read-only (get-loan-balance (borrower principal) (lender principal))
+    (default-to u0 (map-get? loanBalances {borrower: borrower, LP: lender}))
 )
 
 (define-private (set-loan-source (borrower principal) (lender principal))
@@ -142,12 +149,17 @@
         (map-set loans
             {borrower: tx-sender, LP: lp}
             {
-                loanBalance: (/ amount u2),
                 originalLoanAmount: (/ amount u2),
                 repaymentBlockDeadline: (+ block-height (unwrap! (get-loan-length-from tx-sender) err-no-interest)),
                 borrowerCollateralAmt: amount,
                 lpCollateralAmt: (* u2 amount)
             }
+        )
+
+        (map-set loanBalances
+            {borrower: tx-sender, LP: lp}
+            (/ amount u2)
+            
         )
 		(ok true)
 		;; TODO: add a new loan event to some dictionary like data store in the smart contract.
@@ -162,6 +174,23 @@
 		(ok true)
 	)
 )
+
+;;TODO: assert that loan balance exists and is greater than zero.
+;; assumptions:
+;;     anyone can pay back anyone's loan if they want to.
+;;     transfer amount doesn't exceed remaining balance
+;; need to delete the loan from the map if its paid off entirely 
+(define-public (repay-loan (amount uint) (borrower principal) (lender principal))
+    (begin
+        (try! (stx-transfer? amount tx-sender lender))
+        (map-set loanBalances
+            {borrower: borrower, LP: lender}
+            (- (get-loan-balance borrower lender) amount)
+        ) 
+        (ok true)
+    )
+)
+
 
 
 ;; TODO: create a dictionary like data-var to store all loans numbered 1 through n and implement in appropriate functions
