@@ -11,6 +11,8 @@
 (define-constant err-sending-to-wrong-LP (err u105))
 (define-constant err-no-existing-loan-offer-from-LP (err u106))
 (define-constant err-not-enough-juice (err u107))
+(define-constant err-with-claim-loan-DNE (err u108))
+(define-constant err-borrower-has-more-time (err u109))
 
 ;;
 
@@ -38,6 +40,11 @@
     uint
 )
 
+(define-map lpCollateralAmount 
+        {borrower: principal, lender: principal}
+        uint
+)
+
 
 ;; variables
 ;; Define coinflow wallet
@@ -62,7 +69,7 @@
 )
 
 (define-read-only (get-loan-repayment-deadline (wallet principal))
-	(map-get? repayDeadline wallet)
+	(default-to u0 (map-get? repayDeadline wallet))
 )
 
 (define-read-only (get-loan-health (borrower principal) (lender principal))
@@ -73,8 +80,21 @@
     (default-to u0 (map-get? loanBalances {borrower: borrower, LP: lender}))
 )
 
+(define-read-only (get-lp-collateral-amount (borrower principal) (lender principal))
+	(map-get? lpCollateralAmount 
+        {borrower: borrower, lender: lender}
+    )
+)
+
 (define-private (set-loan-source (borrower principal) (lender principal))
 	(map-set loanSource borrower lender)
+)
+
+(define-private (set-lp-collateral-amount (amount uint) (borrower principal) (lender principal))
+	(map-set lpCollateralAmount 
+        {borrower: borrower, lender: lender}
+        amount
+    )
 )
 
 (define-private (set-debt-source (borrower principal) (lender principal))
@@ -105,6 +125,7 @@
 		(map-set loanSource borrower tx-sender)
 		(map-set debtSource tx-sender borrower)
 		(try! (stx-transfer? (* u5 loanAmount) tx-sender (var-get coinflowWallet)))
+        (set-lp-collateral-amount (* u4 loanAmount) borrower tx-sender)
 		(ok true)
 	)
 )
@@ -191,7 +212,20 @@
     )
 )
 
+;; Scenario 2: Borrower fails to repay loan IN FULL by repayment deadline.
+;; assumptions: 
+;;      if don't payback in full, cannot claim any of borrower LPs. in practice, this should be prorated to some extent if borrower pays back 99% for example.
+;;      who is able to call this txn and when? need to be sure!
+(define-public (claim-lp-collateral (borrower principal) (lender principal))
+    (begin
+        (asserts! (> (get-loan-balance borrower tx-sender) u0) err-with-claim-loan-DNE)
+        (asserts! (> block-height (unwrap-panic (map-get? repayDeadline borrower))) err-borrower-has-more-time)
+		(try! (as-contract (stx-transfer? (unwrap-panic (get-lp-collateral-amount borrower lender)) tx-sender lender)))
+        (ok true)
+    )
+)
 
+;;TODO: create a function for the borrower to claim the LP collateral IFF borrower repays in full AND LP doesn't return collateral
 
 ;; TODO: create a dictionary like data-var to store all loans numbered 1 through n and implement in appropriate functions
 ;; aybe appropriate functions is just send-STX-collateral-to-LP?
