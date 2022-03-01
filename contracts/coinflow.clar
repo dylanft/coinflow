@@ -13,11 +13,17 @@
 (define-constant err-not-enough-juice (err u107))
 (define-constant err-with-claim-loan-DNE (err u108))
 (define-constant err-borrower-has-more-time (err u109))
+(define-constant ERR-UNEQUAL-COLLATERAL-REPAYMENT (err u110))
+(define-constant ERR-LENDER-MUST-RETURN-COLLATERAL (err u111)) 
+(define-constant ERR-FALSE-CLAIM-ON-BORROWER-COLLATERAL (err u112))
+(define-constant ERR-LP-HAS-MORE-TIME-TO-RETURN-COLLATERAL (err u113))
+(define-constant ERR-LP-ALREADY-RETURNED-COLLATERAL (err u114))
 
 ;;
 
 ;; other constants
 (define-constant stx-to-usd-ratio u3)
+(define-constant LP-COLLATERAL-REPAYMENT-BUFFER u100)
 
 ;; maps
 (define-map loanInterest principal uint)
@@ -43,6 +49,10 @@
 (define-map lpCollateralAmount 
         {borrower: principal, lender: principal}
         uint
+)
+(define-map hasLendereReturnedCollateral
+    {borrower: principal, lender: principal}
+    bool
 )
 
 
@@ -86,6 +96,17 @@
     )
 )
 
+(define-read-only (get-status-of-LP-collateral-return (borrower principal) (lender principal))
+    (default-to false (map-get? hasLendereReturnedCollateral {borrower: borrower, lender: lender}))
+)
+
+(define-private (set-status-of-LP-collateral-return (borrower principal) (lender principal) (status bool))
+    (map-set hasLendereReturnedCollateral 
+        {borrower: borrower, lender: lender}
+        status
+    )
+)
+
 (define-private (set-loan-source (borrower principal) (lender principal))
 	(map-set loanSource borrower lender)
 )
@@ -99,6 +120,29 @@
 
 (define-private (set-debt-source (borrower principal) (lender principal))
 	(map-set debtSource lender borrower)
+)
+
+;;TODO: This function will be updated to check to see if the native BTC txn has occurred based on additional input
+;; collateral returned could be a variable that gets updated based on txn checks
+(define-public (return-collateral-to-borrower (amount uint) (borrower principal) (lender principal))
+    (begin
+        (asserts! (is-eq amount (get borrowerCollateralAmt (unwrap-panic (get-loan-health borrower lender)))) ERR-UNEQUAL-COLLATERAL-REPAYMENT)
+        (asserts! (is-eq tx-sender lender) ERR-LENDER-MUST-RETURN-COLLATERAL)
+        (try! (as-contract (stx-transfer? amount tx-sender borrower)))
+        (set-status-of-LP-collateral-return borrower lender true)
+        (ok true)
+    )
+)
+
+(define-public (claim-borrower-collateral (amount uint) (borrower principal) (lender principal))
+    (begin
+        (asserts! (is-eq tx-sender borrower) ERR-FALSE-CLAIM-ON-BORROWER-COLLATERAL)
+        (asserts! (is-eq amount (get borrowerCollateralAmt (unwrap-panic (get-loan-health borrower lender)))) ERR-UNEQUAL-COLLATERAL-REPAYMENT)
+        (asserts! (>= (+ block-height LP-COLLATERAL-REPAYMENT-BUFFER) (get repaymentBlockDeadline (unwrap-panic (get-loan-health borrower lender)))) ERR-LP-HAS-MORE-TIME-TO-RETURN-COLLATERAL)
+        (asserts! (is-eq false (get-status-of-LP-collateral-return borrower lender)) ERR-LP-ALREADY-RETURNED-COLLATERAL)
+        (try! (as-contract (stx-transfer? amount tx-sender borrower)))
+        (ok true)
+    )
 )
 
 ;; TODO: borrower must also select a max acceptable interest rate over the repayment terms they want.
