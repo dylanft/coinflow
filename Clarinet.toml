@@ -19,7 +19,11 @@ depends_on = ["sip-010-trait-ft-standard"]
 
 [contracts.wrapped-bitcoin]
 path = "contracts/wrapped-bitcoin.clar"
-depends_on = []
+depends_on = ["sip-010-trait-ft-standard"]
+
+[contracts.coinflow-usda-xbtc]
+path = "contracts/coinflow-usda-xbtc.clar"
+depends_on = ["usda-token", "wrapped-bitcoin"]
 
 [repl]
 costs_version = 2
