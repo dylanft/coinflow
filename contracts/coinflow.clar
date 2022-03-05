@@ -1,6 +1,9 @@
-
 ;; coinflow
 ;; Proof of Concept for putting collateral to work for a short term loan.
+
+;;(impl-trait 'SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR.usda-token)
+;;(try! (contract-call? 'SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.miamicoin-token transfer total-artist tx-sender (var-get artist-address) (some 0x00)))
+;; (use-trait .usda-token)
 
 ;; error constants
 (define-constant err-negative-loan-amount (err u100))

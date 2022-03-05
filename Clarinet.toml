@@ -1,6 +1,35 @@
 [project]
 name = "coinflow"
+authors = []
+description = ""
+telemetry = false
 requirements = []
+
 [contracts.coinflow]
 path = "contracts/coinflow.clar"
 depends_on = []
+
+[contracts.sip-010-trait-ft-standard]
+path = "contracts/sip-010-trait-ft-standard.clar"
+depends_on = []
+
+[contracts.usda-token]
+path = "contracts/usda-token.clar"
+depends_on = ["sip-010-trait-ft-standard"]
+
+[contracts.wrapped-bitcoin]
+path = "contracts/wrapped-bitcoin.clar"
+depends_on = []
+
+[repl]
+costs_version = 2
+parser_version = 2
+
+[repl.analysis]
+passes = []
+
+[repl.analysis.check_checker]
+strict = false
+trusted_sender = false
+trusted_caller = false
+callee_filter = false
