@@ -22,6 +22,18 @@
 (define-constant ERR-LP-HAS-MORE-TIME-TO-RETURN-COLLATERAL (err u113))
 (define-constant ERR-LP-ALREADY-RETURNED-COLLATERAL (err u114))
 (define-constant ERR-LOAN-AMT-INCORRECT (err u115))
+(define-constant UNAUTHORIZED-MVMT-BORROWER-COLLATERAL (err u116))
+
+
+(define-constant err-no-interest2 (err u202))
+(define-constant err-no-interest3 (err u203))
+(define-constant err-no-interest4 (err u204))
+(define-constant err-no-interest5 (err u205))
+(define-constant err-no-interest6 (err u206))
+(define-constant err-no-interest7 (err u207))
+(define-constant err-no-interest8 (err u208))
+(define-constant err-no-interest9 (err u209))
+
 
 ;;
 
@@ -62,7 +74,7 @@
 
 ;; variables
 ;; Define coinflow wallet
-(define-data-var coinflowWallet principal 'ST1HTBVD3JG9C05J7HBJTHGR0GGW7KXW28M5JS8QE.coinflow)
+(define-data-var coinflowWallet principal 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.coinflow-usda-xbtc)
 
 
 ;; functions
@@ -223,6 +235,133 @@
 	)
 )
 
+(define-public (borrower-sends-collateral-v2 (amount uint) (lp principal) (memo (optional (buff 34))))
+    (let
+        (
+            (loanAmount (unwrap! (get-loan-interest-from tx-sender) err-no-interest9))
+            (borrower tx-sender)
+        )
+        (print loanAmount)
+        (print amount)
+        (print lp)
+        (print memo)
+    
+        ;;checks to see if the borrower has declared interest in getting a loan. otherwise, txn fails.
+        (asserts! (>= loanAmount u0) err-insufficient-funds)
+
+		;; asserts that LP input is same as wallet that locked up the loan amount and LP collateral.
+		(asserts! (is-eq lp (unwrap! (get-loan-source-from tx-sender) err-no-existing-loan-offer-from-LP)) err-sending-to-wrong-LP)
+
+        ;; amount represents XBTC being sent by borrower
+		;; ensure OVER collateralizing with 2x usda loan amount worth of XBTC. oracle implementation needed for this and to handle liquidation scenarios. 
+		(asserts! (>= (/ (* usda-to-xbtc-ratio amount) u2) loanAmount) (err u210))
+
+		;; ensures its not too late to initialize the loan
+		(asserts! (< block-height (unwrap! (get-loan-init-deadline tx-sender) err-no-interest4)) err-past-loan-init-deadline)
+
+		;; Borrower sends collateral for their loan amount to the LP
+        (try! (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.wrapped-bitcoin transfer amount tx-sender lp memo))
+
+        ;; claim usda tokens from smart contract to initialize loan
+        ;; (try! (as-contract (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usda-token transfer loanAmount tx-sender borrower none)))
+        (try! (initialize-loan-v3 loanAmount borrower lp none))
+        
+        
+        ;; (try! (as-contract (contract-call? .usda-token transfer loanAmount (as-contract tx-sender) lp memo)))
+        ;; (try! (initialize-loan-v3 loanAmount borrower lp memo))
+        ;; (try! (as-contract (stx-transfer? loanAmount tx-sender borrower)))
+        ;; (try! (as-contract (initialize-loan-v2 loanAmount borrower lp memo)))
+   		;; (try!
+        ;;    (as-contract
+        ;;         (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usda-token 
+        ;;             transfer
+        ;;             loanAmount
+        ;;             tx-sender
+        ;;             lp
+        ;;             memo
+        ;;         )
+        ;;     )
+        ;; )
+		(map-set repayDeadline tx-sender (+ block-height (unwrap! (get-loan-length-from tx-sender) err-no-interest6)))
+
+        (ok true)
+        ;; (ok (initialize-loan-v3 loanAmount borrower lp none))
+        ;; (as-contract (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usda-token transfer loanAmount tx-sender borrower none))
+        ;; (ok (as-contract (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usda-token transfer loanAmount tx-sender borrower none)))
+        ;; (ok (as-contract (contract-call? .usda-token transfer loanAmount (as-contract tx-sender) lp memo)))
+    )
+)
+
+
+(define-public (borrower-sends-collateral (amount uint) (lp principal) (memo (optional (buff 34))))
+	(begin 
+		;;checks to see if the borrower has declared interest in getting a loan. otherwise, txn fails.
+		(asserts! (>= (unwrap! (get-loan-interest-from tx-sender) err-no-interest2) u0) err-insufficient-funds)
+		
+		;; asserts that LP input is same as wallet that locked up the loan amount and LP collateral.
+		(asserts! (is-eq lp (unwrap! (get-loan-source-from tx-sender) err-no-existing-loan-offer-from-LP)) err-sending-to-wrong-LP)
+
+        ;; amount represents XBTC being sent by borrower
+		;; ensure OVER collateralizing with 2x usda loan amount worth of XBTC. oracle implementation needed for this and to handle liquidation scenarios. 
+		(asserts! (>= (/ (* usda-to-xbtc-ratio amount) u2) (unwrap! (get-loan-interest-from tx-sender) err-no-interest3)) err-insufficient-funds)
+		
+		;; ensures its not too late to initialize the loan
+		(asserts! (< block-height (unwrap! (get-loan-init-deadline tx-sender) err-no-interest4)) err-past-loan-init-deadline)
+		
+		;; Borrower sends collateral for their loan amount to the LP
+        (try! (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.wrapped-bitcoin transfer amount tx-sender lp memo))
+
+
+        ;; (try! (initialize-loan (unwrap! (get-loan-interest-from tx-sender) err-no-interest) tx-sender lp memo))
+        ;; Initialize loan
+        ;; (let
+        ;;     (loanAmount (unwrap! (get-loan-interest-from tx-sender) err-no-interest5))
+        ;;     ;; (try!
+        ;;     ;; (as-contract
+        ;;     ;;         (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usda-token 
+        ;;     ;;             transfer
+        ;;     ;;             loanAmount ;;(unwrap! (get-loan-interest-from tx-sender) err-no-interest5)
+        ;;     ;;             tx-sender
+        ;;     ;;             lp
+        ;;     ;;             memo
+        ;;     ;;         )
+        ;;     ;;     )
+        ;;     ;; )    
+        ;; )      
+   		(try!
+           (as-contract
+                (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usda-token 
+                    transfer
+                    (unwrap! (get-loan-interest-from tx-sender) err-no-interest5)
+                    tx-sender
+                    lp
+                    memo
+                )
+            )
+        )
+		(map-set repayDeadline tx-sender (+ block-height (unwrap! (get-loan-length-from tx-sender) err-no-interest6)))
+        
+        ;; Initialize the loan and store info in map
+        (map-set loans
+            {borrower: tx-sender, LP: lp}
+            {
+                originalLoanAmount: (unwrap! (get-loan-interest-from tx-sender) err-no-interest7), ;; in USDA
+                repaymentBlockDeadline: (+ block-height (unwrap! (get-loan-length-from tx-sender) err-no-interest8)),
+                borrowerCollateralAmt: amount, ;;in  XBTC
+                ;; lpCollateralAmt: (* u4 (unwrap! (get-loan-interest-from tx-sender) err-no-interest))
+                lpCollateralAmt: (unwrap! (get-lp-collateral-amount tx-sender lp) err-no-existing-loan-offer-from-LP) ;; in USDA
+            }
+        )
+
+        (map-set loanBalances
+            {borrower: tx-sender, LP: lp}
+            (/ amount u2)
+            
+        )
+		(ok true)
+	)
+)
+
 (define-private (initialize-loan (loanAmount uint) (borrower principal) (lender principal) (memo (optional (buff 34))))
 	(begin 
    		(try! (as-contract (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usda-token transfer loanAmount tx-sender lender memo)))
@@ -233,6 +372,68 @@
 	)
 )
 
+(define-public (initialize-loan-v2 (loanAmount uint) (borrower principal) (lender principal) (memo (optional (buff 34))))
+	(begin 
+        (asserts! (is-eq tx-sender borrower) UNAUTHORIZED-MVMT-BORROWER-COLLATERAL)
+   		;; (try! (as-contract (stx-transfer? loanAmount tx-sender borrower)))
+   		(try! (stx-transfer? loanAmount (as-contract tx-sender) borrower))
+
+   		;; (try! (as-contract (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usda-token transfer loanAmount tx-sender lender memo)))
+
+		;; (try! (as-contract (stx-transfer? (/ loanAmount u100) tx-sender lender)))
+		;; (try! (as-contract (stx-transfer? (- loanAmount (/ loanAmount u100)) tx-sender borrower)))
+		(ok true)
+	)
+)
+
+
+(define-public (initialize-loan-v3 (loanAmount uint) (borrower principal) (lender principal) (memo (optional (buff 34))))
+	(begin 
+        ;; (asserts! (is-eq tx-sender borrower) UNAUTHORIZED-MVMT-BORROWER-COLLATERAL)
+   		;; (try! (as-contract (stx-transfer? loanAmount tx-sender borrower)))
+   		;; (as-contract (stx-transfer? loanAmount contract-caller borrower))
+        (print contract-caller)
+        (print (as-contract tx-sender))
+        (as-contract (print contract-caller))
+        (as-contract (print tx-sender))
+        (try! (stx-transfer? u100 tx-sender lender))
+        (try! (stx-transfer? u100 tx-sender (as-contract tx-sender)))
+        ;; (try! (as-contract (stx-transfer? u100 tx-sender borrower)))
+        
+        ;; (ok (as-contract (stx-transfer? u100 tx-sender 'ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5)))
+        ;; (try! (as-contract (contract-call? .usda-token transfer loanAmount (as-contract tx-sender) lender memo))) 
+        ;; ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.coinflow-usda-xbtc |
+        ;; (try! (as-contract (contract-call? .usda-token transfer loanAmount 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.coinflow-usda-xbtc borrower memo)))
+
+        ;; (as-contract (print (as-contract tx-sender)))
+        ;; (ok (as-contract (contract-call? .usda-token transfer loanAmount (as-contract tx-sender) borrower memo)))
+        ;; (try! (as-contract (contract-call?
+        ;;     'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usda-token
+        ;;     transfer
+        ;;     loanAmount
+        ;;     (as-contract tx-sender)
+        ;;     borrower
+        ;;     none
+        ;;     )))
+        ;; (ok (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usda-token get-balance (as-contract tx-sender)))
+        (print (unwrap! (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usda-token get-balance 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.coinflow-usda-xbtc) (err u12000)))
+        (print (unwrap! (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usda-token get-balance tx-sender) (err u12001)))
+        (print (unwrap! (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usda-token get-balance (as-contract tx-sender)) (err u12001)))
+
+        ;; (ok (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usda-token get-balance 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.coinflow-usda-xbtc))
+
+        (print (as-contract (unwrap! (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usda-token get-balance 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.coinflow-usda-xbtc) (err u12002))))
+        (print (as-contract (unwrap! (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usda-token get-balance tx-sender) (err u12003))))
+        (print (as-contract (unwrap! (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usda-token get-balance (as-contract tx-sender)) (err u12004))))
+
+        (try! (as-contract (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usda-token transfer loanAmount tx-sender borrower none)))
+        ;; (print (as-contract (unwrap! (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usda-token transfer loanAmount 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.coinflow-usda-xbtc 'ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5 none) (err u12000))))
+
+        ;; below works
+        ;; (ok (as-contract (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usda-token transfer loanAmount tx-sender borrower none)))
+        (ok true)
+	)
+)   
 ;;TODO: assert that loan balance exists and is greater than zero !!!!!!!!
 ;; assumptions:
 ;;     anyone can pay back anyone's loan if they want to.
@@ -340,3 +541,10 @@
 ;; ::advance_chain_tip 1
 ;; ::set_tx_sender ST1J4G6RR643BCG8G8SR6M2D9Z9KXT2NJDRK3FBTK
 ;; (contract-call? 'ST1HTBVD3JG9C05J7HBJTHGR0GGW7KXW28M5JS8QE.coinflow send-collateral-to-LP u2000 'STFCVYY1RJDNJHST7RRTPACYHVJQDJ7R1DWTQHQA)
+
+
+
+
+
+
+
