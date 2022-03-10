@@ -235,6 +235,30 @@
 	)
 )
 
+(define-public (initialize-loan-v4 (usdaAmount uint) (xbtcAmount uint) (borrower principal) (lender principal) (memo (optional (buff 34))))
+    (begin
+        ;;checks to see if the borrower has declared interest in getting a loan. otherwise, txn fails.
+        (asserts! (>= usdaAmount u0) err-insufficient-funds)
+
+		;; asserts that LP input is same as wallet that locked up the loan amount and LP collateral.
+		(asserts! (is-eq lender (unwrap! (get-loan-source-from tx-sender) err-no-existing-loan-offer-from-LP)) err-sending-to-wrong-LP)
+
+		;; ensure OVER collateralizing with 2x usda loan amount worth of XBTC. oracle implementation needed for this and to handle liquidation scenarios. 
+		(asserts! (>= (/ (* usda-to-xbtc-ratio xbtcAmount) u2) usdaAmount) (err u210))
+
+		;; ensures its not too late to initialize the loan
+		(asserts! (< block-height (unwrap! (get-loan-init-deadline tx-sender) err-no-interest4)) err-past-loan-init-deadline)
+
+		;; Borrower sends collateral for their loan amount to the LP
+        (try! (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.wrapped-bitcoin transfer xbtcAmount tx-sender lender memo))
+
+		;; Borrower claims / is sent the usda loan amount
+        (try! (as-contract (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usda-token transfer usdaAmount tx-sender borrower none)))
+
+        (ok true)
+    )
+)
+
 (define-public (borrower-sends-collateral-v2 (amount uint) (lp principal) (memo (optional (buff 34))))
     (let
         (
