@@ -1,21 +1,17 @@
 ;; coinflow
 ;; Proof of Concept for putting collateral to work for a short term loan.
 
-;;(impl-trait 'SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR.usda-token)
-;;(try! (contract-call? 'SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.miamicoin-token transfer total-artist tx-sender (var-get artist-address) (some 0x00)))
-;; (use-trait .usda-token)
-
 ;; error constants
-(define-constant err-negative-loan-amount (err u100))
-(define-constant err-not-enough-days (err u101))
-(define-constant err-no-interest (err u102))
-(define-constant err-insufficient-funds (err u103))
-(define-constant err-past-loan-init-deadline (err u104))
-(define-constant err-sending-to-wrong-LP (err u105))
-(define-constant err-no-existing-loan-offer-from-LP (err u106))
-(define-constant err-not-enough-juice (err u107))
-(define-constant err-with-claim-loan-DNE (err u108))
-(define-constant err-borrower-has-more-time (err u109))
+(define-constant ERR-NEGATIVE-LOAN-AMOUNT (err u100))
+(define-constant ERR-NOT-ENOUGH-DAYS (err u101))
+(define-constant ERR-NO-INTEREST (err u102))
+(define-constant ERR-INSUFFICIENT-FUNDS (err u103))
+(define-constant ERR-PAST-LOAN-INIT-DEADLINE (err u104))
+(define-constant ERR-SENDING-TO-WRONG-LP (err u105))
+(define-constant ERR-NO-EXISTING-LOAN-OFFER-FROM-LP (err u106))
+(define-constant ERR-NOT-ENOUGH-JUICE (err u107))
+(define-constant ERR-WITH-CLAIM-LOAN-DNE (err u108))
+(define-constant ERR-BORROWER-HAS-MORE-TIME (err u109))
 (define-constant ERR-UNEQUAL-COLLATERAL-REPAYMENT (err u110))
 (define-constant ERR-LENDER-MUST-RETURN-COLLATERAL (err u111)) 
 (define-constant ERR-FALSE-CLAIM-ON-BORROWER-COLLATERAL (err u112))
@@ -25,14 +21,14 @@
 (define-constant UNAUTHORIZED-MVMT-BORROWER-COLLATERAL (err u116))
 
 
-(define-constant err-no-interest2 (err u202))
-(define-constant err-no-interest3 (err u203))
-(define-constant err-no-interest4 (err u204))
-(define-constant err-no-interest5 (err u205))
-(define-constant err-no-interest6 (err u206))
-(define-constant err-no-interest7 (err u207))
-(define-constant err-no-interest8 (err u208))
-(define-constant err-no-interest9 (err u209))
+(define-constant ERR-NO-INTEREST2 (err u202))
+(define-constant ERR-NO-INTEREST3 (err u203))
+(define-constant ERR-NO-INTEREST4 (err u204))
+(define-constant ERR-NO-INTEREST5 (err u205))
+(define-constant ERR-NO-INTEREST6 (err u206))
+(define-constant ERR-NO-INTEREST7 (err u207))
+(define-constant ERR-NO-INTEREST8 (err u208))
+(define-constant ERR-NO-INTEREST9 (err u209))
 
 
 ;;
@@ -142,9 +138,9 @@
 ;; TODO: borrower must also select a max acceptable interest rate over the repayment terms they want.
 (define-public (signal-interest (loanAmount uint) (blocksToRepay uint))
 	(begin
-		(asserts! (> loanAmount u0) err-negative-loan-amount)
-		(asserts! (>= loanAmount u100) err-not-enough-juice)
-		(asserts! (>= blocksToRepay u144) err-not-enough-days)
+		(asserts! (> loanAmount u0) ERR-NEGATIVE-LOAN-AMOUNT)
+		(asserts! (>= loanAmount u100) ERR-NOT-ENOUGH-JUICE)
+		(asserts! (>= blocksToRepay u144) ERR-NOT-ENOUGH-DAYS)
 		(print loanAmount)
 		(print blocksToRepay)
 		(print tx-sender)
@@ -158,9 +154,9 @@
 	;; TODO: assert that there is interest from the borrower
 	;; TODO: lookup loanAmount and ensure LP has enough collateral to lock up and to offer the loan
 	(begin 
-		(asserts! (>= (unwrap! (get-loan-interest-from borrower) err-no-interest) u0) err-insufficient-funds)
+		(asserts! (>= (unwrap! (get-loan-interest-from borrower) ERR-NO-INTEREST) u0) ERR-INSUFFICIENT-FUNDS)
         ;; can probably remove this function and have the transfer amount gathered based on the get-loan-interest-from fcn
-        (asserts! (is-eq loanAmount (unwrap! (get-loan-interest-from borrower) err-no-interest)) ERR-LOAN-AMT-INCORRECT)
+        (asserts! (is-eq loanAmount (unwrap! (get-loan-interest-from borrower) ERR-NO-INTEREST)) ERR-LOAN-AMT-INCORRECT)
 		(map-set initDeadline borrower (+ block-height blocksToInitialize))
 		(map-set loanSource borrower tx-sender)
 		(map-set debtSource tx-sender borrower)
@@ -174,16 +170,16 @@
 (define-public (initialize-loan (usdaAmount uint) (xbtcAmount uint) (borrower principal) (lender principal) (memo (optional (buff 34))))
     (begin
         ;;checks to see if the borrower has declared interest in getting a loan. otherwise, txn fails.
-        (asserts! (>= usdaAmount u0) err-insufficient-funds)
+        (asserts! (>= usdaAmount u0) ERR-INSUFFICIENT-FUNDS)
 
 		;; asserts that LP input is same as wallet that locked up the loan amount and LP collateral.
-		(asserts! (is-eq lender (unwrap! (get-loan-source-from tx-sender) err-no-existing-loan-offer-from-LP)) err-sending-to-wrong-LP)
+		(asserts! (is-eq lender (unwrap! (get-loan-source-from tx-sender) ERR-NO-EXISTING-LOAN-OFFER-FROM-LP)) ERR-SENDING-TO-WRONG-LP)
 
 		;; ensure OVER collateralizing with 2x usda loan amount worth of XBTC. oracle implementation needed for this and to handle liquidation scenarios. 
 		(asserts! (>= (/ (* usda-to-xbtc-ratio xbtcAmount) u2) usdaAmount) (err u210))
 
 		;; ensures its not too late to initialize the loan
-		(asserts! (< block-height (unwrap! (get-loan-init-deadline tx-sender) err-no-interest4)) err-past-loan-init-deadline)
+		(asserts! (< block-height (unwrap! (get-loan-init-deadline tx-sender) ERR-NO-INTEREST4)) ERR-PAST-LOAN-INIT-DEADLINE)
 
 		;; Borrower sends collateral for their loan amount to the LP
         (try! (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.wrapped-bitcoin transfer xbtcAmount tx-sender lender memo))
@@ -191,17 +187,17 @@
 		;; Borrower claims / is sent the usda loan amount
         (try! (as-contract (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usda-token transfer usdaAmount tx-sender borrower none)))
 
-        (map-set repayDeadline tx-sender (+ block-height (unwrap! (get-loan-length-from tx-sender) err-no-interest6)))
+        (map-set repayDeadline tx-sender (+ block-height (unwrap! (get-loan-length-from tx-sender) ERR-NO-INTEREST6)))
         
         ;; Initialize the loan and store info in map
         (map-set loans
             {borrower: tx-sender, LP: lender}
             {
-                originalLoanAmount: (unwrap! (get-loan-interest-from tx-sender) err-no-interest7), ;; in USDA
-                repaymentBlockDeadline: (+ block-height (unwrap! (get-loan-length-from tx-sender) err-no-interest8)),
+                originalLoanAmount: (unwrap! (get-loan-interest-from tx-sender) ERR-NO-INTEREST7), ;; in USDA
+                repaymentBlockDeadline: (+ block-height (unwrap! (get-loan-length-from tx-sender) ERR-NO-INTEREST8)),
                 borrowerCollateralAmt: xbtcAmount, ;;in  XBTC
-                ;; lpCollateralAmt: (* u4 (unwrap! (get-loan-interest-from tx-sender) err-no-interest))
-                lpCollateralAmt: (unwrap! (get-lp-collateral-amount tx-sender lender) err-no-existing-loan-offer-from-LP) ;; in USDA
+                ;; lpCollateralAmt: (* u4 (unwrap! (get-loan-interest-from tx-sender) ERR-NO-INTEREST))
+                lpCollateralAmt: (unwrap! (get-lp-collateral-amount tx-sender lender) ERR-NO-EXISTING-LOAN-OFFER-FROM-LP) ;; in USDA
             }
         )
 
@@ -225,7 +221,7 @@
 ;; need to delete the loan from the map if its paid off entirely 
 (define-public (repay-loan (amount uint) (borrower principal) (lender principal) (memo (optional (buff 34))))
     (begin
-        (asserts! (> (get-loan-balance borrower lender) u0) err-with-claim-loan-DNE)
+        (asserts! (> (get-loan-balance borrower lender) u0) ERR-WITH-CLAIM-LOAN-DNE)
         ;; (try! (stx-transfer? amount tx-sender lender))
         (try! (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usda-token transfer amount tx-sender lender memo))
         ;; (try! (stx-transfer? amount tx-sender lender))
@@ -243,8 +239,8 @@
 ;;      who is able to call this txn and when? need to be sure!
 (define-public (claim-lp-collateral (borrower principal) (lender principal))
     (begin
-        (asserts! (> (get-loan-balance borrower tx-sender) u0) err-with-claim-loan-DNE)
-        (asserts! (> block-height (unwrap-panic (map-get? repayDeadline borrower))) err-borrower-has-more-time)
+        (asserts! (> (get-loan-balance borrower tx-sender) u0) ERR-WITH-CLAIM-LOAN-DNE)
+        (asserts! (> block-height (unwrap-panic (map-get? repayDeadline borrower))) ERR-BORROWER-HAS-MORE-TIME)
 		;; (try! (as-contract (stx-transfer? (unwrap-panic (get-lp-collateral-amount borrower lender)) tx-sender lender)))
 		(try! (as-contract (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usda-token transfer (unwrap-panic (get-lp-collateral-amount borrower lender)) tx-sender lender none)))
 
