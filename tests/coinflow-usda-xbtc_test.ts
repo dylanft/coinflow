@@ -16,8 +16,8 @@ Clarinet.test({
              * Tx.contractCall(...)
             */
             Tx.contractCall("ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.coinflow-usda-xbtc","signal-interest", ["u1000000", "u145"], borrower),
-            Tx.contractCall("coinflow-usda-xbtc","lock-up-LP-collateral", [types.principal(borrower), "u288", "u1000000"], lender),
-            // Tx.contractCall("coinflow-usda-xbtc","send-collateral-to-LP", ["u40", types.principal(lender), "none"], borrower)
+            Tx.contractCall("coinflow-usda-xbtc","lock-up-lender-collateral", [types.principal(borrower), "u288", "u1000000"], lender),
+            Tx.contractCall("coinflow-usda-xbtc","initialize-usda-loan", ["u1000000","u40", types.principal(borrower), types.principal(lender), "none"], borrower)
 
         ]);
         // assertEquals(block.receipts.length, 0);
