@@ -1,6 +1,7 @@
 # coinflow
 Proof of Concept for putting collateral to work for a short term loan.
 
+[embed]https://www.bitflow.finance/_files/ugd/a03832_cf67cb1e86bf44a3a5186e36357c4559.pdf[/embed]
 <!-- 
 Example:
 >> ::set_tx_sender ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5
