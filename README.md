@@ -1,5 +1,10 @@
 # coinflow
-Proof of Concept for putting collateral to work for a short term loan.
+Proof of Concept
+
+Unlock healthy financial partnerships throughout your supply chain on your terms by leveraging Bitcoin centric DeFi
+
+[SCF Diagrams.pdf](https://github.com/dylanft/coinflow/files/8407787/SCF.Diagrams.pdf)
+
 
 <!-- 
 Example:
